@@ -7,13 +7,9 @@ const stage = new Konva.Stage({
   height: window.innerHeight,
   draggable: false,
 });
+
 const layer = new Konva.Layer();
 stage.add(layer);
-
-socket.on('clear-canvas', () => {
-  layer.destroyChildren();
-  layer.batchDraw();
-});
 
 let mode = 'brush';
 let isDrawing = false;
@@ -49,8 +45,13 @@ document.getElementById('size-slider').addEventListener('input', e => {
   brushSize = parseInt(e.target.value);
 });
 
+socket.on('clear-canvas', () => {
+  layer.destroyChildren();
+  layer.batchDraw();
+});
+
 socket.on('draw-start', ({ id, x, y, color, size, mode }) => {
-  if (id === userId || mode === 'texture') return;
+  if (id === userId) return;
 
   const line = new Konva.Line({
     stroke: mode === 'eraser' ? 'black' : color,
@@ -58,37 +59,14 @@ socket.on('draw-start', ({ id, x, y, color, size, mode }) => {
     globalCompositeOperation: mode === 'eraser' ? 'destination-out' : 'source-over',
     points: [x, y],
     lineCap: 'round',
-    lineJoin: 'round'
+    lineJoin: 'round',
+    id
   });
   incomingStrokes[id] = line;
   layer.add(line);
 });
 
-socket.on('draw-progress', ({ id, x, y, color, size, mode }) => {
-  if (mode === 'texture') {
-    for (let i = 0; i < 5; i++) {
-      const offsetX = (Math.random() - 0.5) * 10;
-      const offsetY = (Math.random() - 0.5) * 10;
-      const alpha = 0.3 + Math.random() * 0.3;
-
-      const dot = new Konva.Line({
-        stroke: color,
-        strokeWidth: 1 + Math.random() * (size / 3),
-        globalAlpha: alpha,
-        points: [
-          x + offsetX,
-          y + offsetY,
-          x + offsetX + Math.random() * 2,
-          y + offsetY + Math.random() * 2,
-        ],
-        lineCap: 'round',
-      });
-      layer.add(dot);
-    }
-    layer.batchDraw();
-    return;
-  }
-
+socket.on('draw-progress', ({ id, x, y }) => {
   const line = incomingStrokes[id];
   if (line) {
     line.points(line.points().concat([x, y]));
@@ -100,12 +78,19 @@ socket.on('draw-end', ({ id }) => {
   delete incomingStrokes[id];
 });
 
+// ✅ Synchronisation suppression
+socket.on('delete-shape', ({ id }) => {
+  const shape = layer.findOne('#' + id);
+  if (shape) {
+    shape.destroy();
+    layer.batchDraw();
+  }
+});
+
 stage.on('mousedown touchstart', () => {
   if (mode === 'pan') return;
   isDrawing = true;
   const pos = stage.getRelativePointerPosition(layer);
-
-  if (mode === 'texture') return;
 
   currentLine = new Konva.Line({
     stroke: mode === 'eraser' ? 'black' : currentColor,
@@ -131,40 +116,6 @@ stage.on('mousedown touchstart', () => {
 stage.on('mousemove touchmove', () => {
   if (!isDrawing) return;
   const pos = stage.getRelativePointerPosition(layer);
-
-  if (mode === 'texture') {
-    for (let i = 0; i < 5; i++) {
-      const offsetX = (Math.random() - 0.5) * 10;
-      const offsetY = (Math.random() - 0.5) * 10;
-      const alpha = 0.3 + Math.random() * 0.3;
-
-      const dot = new Konva.Line({
-        stroke: currentColor,
-        strokeWidth: 1 + Math.random() * (brushSize / 3),
-        globalAlpha: alpha,
-        points: [
-          pos.x + offsetX,
-          pos.y + offsetY,
-          pos.x + offsetX + Math.random() * 2,
-          pos.y + offsetY + Math.random() * 2,
-        ],
-        lineCap: 'round',
-      });
-      layer.add(dot);
-    }
-    layer.batchDraw();
-
-    socket.emit('draw-progress', {
-      id: userId,
-      x: pos.x,
-      y: pos.y,
-      color: currentColor,
-      size: brushSize,
-      mode
-    });
-    return;
-  }
-
   currentLine.points(currentLine.points().concat([pos.x, pos.y]));
   layer.batchDraw();
 
@@ -182,9 +133,4 @@ stage.on('mouseup touchend', () => {
   if (!isDrawing) return;
   isDrawing = false;
   socket.emit('draw-end', { id: userId });
-});
-socket.on('delete-shape', ({ id }) => {
-  const shape = layer.findOne('#' + id);
-  if (shape) shape.destroy();
-  layer.batchDraw();
 });
