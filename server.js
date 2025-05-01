@@ -1,3 +1,5 @@
+require('dotenv').config(); // Charge les variables d’environnement
+
 const express = require('express');
 const http = require('http');
 const path = require('path');
@@ -9,20 +11,26 @@ const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Route publique
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/index.html'));
 });
 
+// ✅ Route admin protégée
 app.get('/chantilly', (req, res) => {
+  const { password } = req.query;
+  if (password !== process.env.ADMIN_PASSWORD) {
+    return res.status(403).send('⛔ Accès refusé');
+  }
   res.sendFile(path.join(__dirname, 'public/admin.html'));
 });
 
+// Stock des tracés en mémoire
 let drawingData = {};
 
 io.on('connection', (socket) => {
   console.log('🟢 Client connecté :', socket.id);
 
-  // Envoyer tous les tracés enregistrés au nouveau client
   for (const [id, points] of Object.entries(drawingData)) {
     socket.emit('draw-start', points[0]);
     for (let i = 1; i < points.length; i++) {
