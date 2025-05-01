@@ -1,4 +1,4 @@
-require('dotenv').config(); // Charge les variables d’environnement
+require('dotenv').config(); // Charge .env
 
 const express = require('express');
 const http = require('http');
@@ -9,28 +9,30 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+// Sert les fichiers statiques depuis ./public
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Route publique
+// Page publique
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/index.html'));
 });
 
-// ✅ Route admin protégée
+// ✅ Page admin protégée par mot de passe dans l'URL
 app.get('/chantilly', (req, res) => {
   const { password } = req.query;
   if (password !== process.env.ADMIN_PASSWORD) {
-    return res.status(403).send('⛔ Accès refusé');
+    return res.redirect('/admin-login.html'); // redirige vers formulaire
   }
   res.sendFile(path.join(__dirname, 'public/admin.html'));
 });
 
-// Stock des tracés en mémoire
+// Canvas data en mémoire
 let drawingData = {};
 
 io.on('connection', (socket) => {
   console.log('🟢 Client connecté :', socket.id);
 
+  // Envoie les tracés existants au nouveau client
   for (const [id, points] of Object.entries(drawingData)) {
     socket.emit('draw-start', points[0]);
     for (let i = 1; i < points.length; i++) {
@@ -65,6 +67,7 @@ io.on('connection', (socket) => {
   });
 });
 
+// 🚀 Port Railway ou local
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`✅ Serveur lancé sur http://localhost:${PORT}`);
