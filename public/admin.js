@@ -1,5 +1,6 @@
 const socket = io();
 const liveStrokes = {};
+let deleteMode = false;
 
 const stage = new Konva.Stage({
   container: 'canvas-container',
@@ -10,128 +11,48 @@ const stage = new Konva.Stage({
 const layer = new Konva.Layer();
 stage.add(layer);
 
-const selectionRect = new Konva.Rect({
-  fill: 'rgba(100,100,255,0.2)',
-  visible: false,
-});
-layer.add(selectionRect);
-
-let selectedShapes = [];
-let selectionStart = null;
-let dragTimer = null;
-let isDragSelecting = false;
-
-const deleteBtn = document.getElementById('delete-btn');
-
-function clearSelection() {
-  layer.find('.selection-outline').forEach(n => n.destroy());
-  selectedShapes = [];
-  deleteBtn.style.display = 'none';
-}
-
-function highlightSelection(shapes) {
-  clearSelection();
-  selectedShapes = shapes;
-
-  shapes.forEach(shape => {
-    const box = shape.getClientRect();
-    const outline = new Konva.Rect({
-      x: box.x - 2,
-      y: box.y - 2,
-      width: box.width + 4,
-      height: box.height + 4,
-      stroke: '#6b5bff',
-      dash: [4, 4],
-      name: 'selection-outline',
-    });
-    layer.add(outline);
-  });
-
-  if (shapes.length > 0) {
-    const last = shapes[shapes.length - 1];
-    const absPos = last.getAbsolutePosition();
-    const stageBox = stage.container().getBoundingClientRect();
-    deleteBtn.style.left = `${absPos.x + stage.x() + stageBox.left + 20}px`;
-    deleteBtn.style.top = `${absPos.y + stage.y() + stageBox.top - 10}px`;
-    deleteBtn.style.display = 'block';
+// 🔁 Activer/désactiver le mode poubelle
+document.getElementById('delete-mode').onclick = () => {
+  deleteMode = !deleteMode;
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+  if (deleteMode) {
+    document.getElementById('delete-mode').classList.add('active');
+    stage.container().style.cursor = 'not-allowed';
+  } else {
+    document.getElementById('pan').classList.add('active');
+    stage.container().style.cursor = 'default';
   }
-
-  layer.batchDraw();
-}
-
-deleteBtn.onclick = () => {
-  selectedShapes.forEach(shape => {
-    const id = shape.id();
-    shape.destroy();
-    socket.emit('delete-shape', { id });
-  });
-  clearSelection();
-  layer.batchDraw();
 };
 
-stage.on('mousedown touchstart', (e) => {
-  if (e.target !== stage) return;
-
-  dragTimer = setTimeout(() => {
-    isDragSelecting = true;
-    selectionStart = stage.getPointerPosition();
-    selectionRect.visible(true);
-    selectionRect.width(0);
-    selectionRect.height(0);
-  }, 200);
-});
-
-stage.on('mousemove touchmove', () => {
-  if (!isDragSelecting || !selectionStart) return;
-
-  const pos = stage.getPointerPosition();
-  const x = Math.min(pos.x, selectionStart.x);
-  const y = Math.min(pos.y, selectionStart.y);
-  const width = Math.abs(pos.x - selectionStart.x);
-  const height = Math.abs(pos.y - selectionStart.y);
-
-  selectionRect.setAttrs({ x, y, width, height });
-  layer.batchDraw();
-});
-
-stage.on('mouseup touchend', (e) => {
-  clearTimeout(dragTimer);
-
-  if (!isDragSelecting || !selectionStart) {
-    isDragSelecting = false;
-    selectionStart = null;
-
-    // sélection simple
-    if (e.target !== stage) {
-      selectedShapes = [e.target];
-      highlightSelection([e.target]);
-    } else {
-      clearSelection();
+// 🖱 Suppression par clic en mode poubelle
+stage.on('click', (e) => {
+  if (deleteMode && e.target !== stage) {
+    const id = e.target.id();
+    if (id) {
+      e.target.destroy();
+      socket.emit('delete-shape', { id });
+      layer.batchDraw();
     }
-    return;
   }
-
-  const box = selectionRect.getClientRect();
-  const shapes = layer.getChildren().toArray().filter(s =>
-    s.id() && Konva.Util.haveIntersection(box, s.getClientRect())
-  );
-
-  selectionRect.visible(false);
-  isDragSelecting = false;
-  selectionStart = null;
-
-  if (shapes.length > 0) highlightSelection(shapes);
-  else clearSelection();
 });
 
-// ✨ sync suppression
+// 🔁 Suppression synchronisée
 socket.on('delete-shape', ({ id }) => {
   const shape = layer.findOne('#' + id);
-  if (shape) shape.destroy();
-  layer.batchDraw();
+  if (shape) {
+    shape.destroy();
+    layer.batchDraw();
+  }
 });
 
-// Minimap
+// 🔁 Clear total
+socket.on('clear-canvas', () => {
+  layer.destroyChildren();
+  layer.batchDraw();
+  updateMinimap();
+});
+
+// 🔍 Minimap
 const minimap = document.getElementById('minimap');
 const minimapCtx = minimap.getContext('2d');
 
@@ -144,7 +65,7 @@ function updateMinimap() {
   img.src = dataURL;
 }
 
-// 🎨 dessin
+// ✏️ Dessin
 socket.on('draw-start', ({ id, x, y, color, size, mode }) => {
   if (mode === 'texture') return;
   const line = new Konva.Line({
@@ -199,13 +120,7 @@ socket.on('draw-end', ({ id }) => {
   delete liveStrokes[id];
 });
 
-socket.on('clear-canvas', () => {
-  layer.destroyChildren();
-  layer.batchDraw();
-  updateMinimap();
-});
-
-// 🔧 UI
+// 🧭 Navigation
 document.getElementById('zoom-in').onclick = () => zoomStage(1.1);
 document.getElementById('zoom-out').onclick = () => zoomStage(1 / 1.1);
 document.getElementById('reset-zoom').onclick = () => {
@@ -232,6 +147,7 @@ function zoomStage(factor) {
   updateMinimap();
 }
 
+// 🎛️ Autres outils
 document.getElementById('bg-black').onclick = () => {
   document.body.style.backgroundColor = '#111';
 };
