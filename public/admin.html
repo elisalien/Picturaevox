@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin – Canvas Collaboratif</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/konva@9.2.0/konva.min.js"></script>
+  <script src="/socket.io/socket.io.js" defer></script>
+  <script src="admin.js" defer></script>
+</head>
+<body>
+  <div id="canvas-container"></div>
+
+  <div class="toolbar admin-toolbar">
+    <button id="pan" class="tool-btn active" title="Déplacement">✋</button>
+    <button id="zoom-in" class="tool-btn" title="Zoom +">➕</button>
+    <button id="zoom-out" class="tool-btn" title="Zoom -">➖</button>
+    <button id="reset-zoom" class="tool-btn" title="Reset">🔄</button>
+
+    <div class="divider"></div>
+
+    <button id="bg-black" class="tool-btn active" title="Fond noir">⬛</button>
+    <button id="bg-white" class="tool-btn" title="Fond blanc">⬜</button>
+
+    <div class="divider"></div>
+
+    <button id="clear-canvas" class="tool-btn" title="Tout effacer">🧼</button>
+    <button id="export" class="tool-btn" title="Exporter PNG">📷</button>
+    <button id="back-home" class="tool-btn" title="Retour utilisateur">↩️</button>
+  </div>
+
+  <!-- 🗺️ Minimap -->
+  <canvas id="minimap" width="120" height="120"
+    style="position:fixed; bottom:80px; right:10px; border:1px solid #555; background:#111; z-index:1000;">
+  </canvas>
+</body>
+</html>
