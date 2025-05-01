@@ -183,3 +183,8 @@ stage.on('mouseup touchend', () => {
   isDrawing = false;
   socket.emit('draw-end', { id: userId });
 });
+socket.on('delete-shape', ({ id }) => {
+  const shape = layer.findOne('#' + id);
+  if (shape) shape.destroy();
+  layer.batchDraw();
+});

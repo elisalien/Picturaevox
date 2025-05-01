@@ -10,6 +10,56 @@ const stage = new Konva.Stage({
 const layer = new Konva.Layer();
 stage.add(layer);
 
+// 🔍 Sélection et suppression
+let selectedShape = null;
+
+function highlightSelection(shape) {
+  clearSelection();
+  const box = shape.getClientRect();
+  const rect = new Konva.Rect({
+    x: box.x - 2,
+    y: box.y - 2,
+    width: box.width + 4,
+    height: box.height + 4,
+    stroke: '#6b5bff',
+    dash: [4, 4],
+    name: 'selection-outline',
+  });
+  layer.add(rect);
+  layer.batchDraw();
+}
+
+function clearSelection() {
+  layer.find('.selection-outline').forEach(n => n.destroy());
+  selectedShape = null;
+}
+
+stage.on('click', (e) => {
+  if (e.target === stage) {
+    clearSelection();
+    return;
+  }
+  selectedShape = e.target;
+  highlightSelection(selectedShape);
+});
+
+document.getElementById('delete')?.addEventListener('click', () => {
+  if (selectedShape) {
+    const id = selectedShape.id();
+    selectedShape.destroy();
+    layer.find('.selection-outline').destroy();
+    layer.batchDraw();
+    socket.emit('delete-shape', { id });
+    selectedShape = null;
+  }
+});
+
+socket.on('delete-shape', ({ id }) => {
+  const shape = layer.findOne('#' + id);
+  if (shape) shape.destroy();
+  layer.batchDraw();
+});
+
 // 🗺️ Minimap
 const minimap = document.getElementById('minimap');
 const minimapCtx = minimap.getContext('2d');
@@ -25,9 +75,11 @@ function updateMinimap() {
   img.src = dataURL;
 }
 
+// 🎨 Réception des traits
 socket.on('draw-start', ({ id, x, y, color, size, mode }) => {
   if (mode === 'texture') return;
   const line = new Konva.Line({
+    id,
     stroke: mode === 'eraser' ? 'black' : color,
     strokeWidth: mode === 'eraser' ? size * 2 : size,
     globalCompositeOperation: mode === 'eraser' ? 'destination-out' : 'source-over',
@@ -85,6 +137,7 @@ socket.on('clear-canvas', () => {
   updateMinimap();
 });
 
+// 🔧 Zoom et outils
 document.getElementById('zoom-in').onclick = () => zoomStage(1.1);
 document.getElementById('zoom-out').onclick = () => zoomStage(1 / 1.1);
 document.getElementById('reset-zoom').onclick = () => {
@@ -111,6 +164,7 @@ function zoomStage(factor) {
   updateMinimap();
 }
 
+// 🎛️ Interface
 document.getElementById('bg-black').onclick = () => {
   document.body.style.backgroundColor = '#111';
 };
@@ -130,19 +184,3 @@ document.getElementById('export').onclick = () => {
   link.href = dataURL;
   link.click();
 };
-minimap.addEventListener('click', (e) => {
-  const rect = minimap.getBoundingClientRect();
-  const clickX = e.clientX - rect.left;
-  const clickY = e.clientY - rect.top;
-
-  const stageWidth = stage.width();
-  const stageHeight = stage.height();
-  const scale = 0.1;
-
-  const targetX = -((clickX / scale) - (stageWidth / 2));
-  const targetY = -((clickY / scale) - (stageHeight / 2));
-
-  stage.position({ x: targetX, y: targetY });
-  stage.batchDraw();
-  updateMinimap();
-});
