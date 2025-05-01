@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dessin Collaboratif</title>
+  <title>Picturævox – Dessin collaboratif</title>
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/konva@9.2.0/konva.min.js"></script>
   <script src="/socket.io/socket.io.js" defer></script>
@@ -13,19 +13,14 @@
   <div id="canvas-container"></div>
 
   <div class="toolbar">
-    <!-- 🖋️ Stylo plume pour le brush classique -->
-    <button id="brush" class="tool-btn active" title="Pinceau classique">🖋️</button>
+    <div class="tools">
+      <button id="brush" class="tool-btn active" title="Stylo">🖋️</button>
+      <button id="texture" class="tool-btn" title="Pinceau texturé">🖌️</button>
+      <button id="eraser" class="tool-btn" title="Gomme">🧽</button>
+      <button id="pan" class="tool-btn" title="Déplacement">✋</button>
+    </div>
 
-    <!-- 🖌️ Pinceau pour le brush texturé -->
-    <button id="texture" class="tool-btn" title="Brush texturé">🖌️</button>
-
-    <button id="eraser" class="tool-btn" title="Gomme">🧽</button>
-    <button id="pan" class="tool-btn" title="Déplacement">✋</button>
-
-    <div class="divider"></div>
-
-    <!-- Couleurs -->
-    <div class="color-palette">
+    <div class="colors">
       <div class="color-btn active" data-color="#FF5252" style="background-color:#FF5252;"></div>
       <div class="color-btn" data-color="#FFD740" style="background-color:#FFD740;"></div>
       <div class="color-btn" data-color="#40C4FF" style="background-color:#40C4FF;"></div>
@@ -33,10 +28,7 @@
       <div class="color-btn" data-color="#E040FB" style="background-color:#E040FB;"></div>
     </div>
 
-    <!-- Épaisseur -->
-    <div class="brush-size">
-      <input type="range" id="size-slider" min="1" max="40" value="4" />
-    </div>
+    <input type="range" id="size-slider" min="1" max="40" value="4" />
   </div>
 </body>
 </html>
