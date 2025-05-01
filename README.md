@@ -1,6 +1,6 @@
-# 🎨 Picturaævox (Konva + Socket.IO)
+# 🎨 Picturævox (Konva + Socket.IO)
 
-**Picturaævox** est une application de dessin collaboratif en temps réel conçue avec [Konva.js](https://konvajs.org/) et [Socket.IO](https://socket.io/), en pur JavaScript. Elle propose deux interfaces distinctes : une pour les utilisateurs publics, et une pour les administrateurs via `/chantilly`. Développée avec ChatGPT par une grosse noob.
+**Picturævox** est une application de dessin collaboratif en temps réel conçue avec [Konva.js](https://konvajs.org/) et [Socket.IO](https://socket.io/), en pur JavaScript. Elle propose deux interfaces distinctes : une pour les utilisateurs publics, et une pour les administrateurs via `/chantilly`. Développée avec ChatGPT par une grosse noob.
 
 ---
 
