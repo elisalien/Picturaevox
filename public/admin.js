@@ -15,6 +15,7 @@ let eraserSize = 10;
 
 function updateCursor() {
   stage.container().style.cursor = mode === 'eraser' ? 'cell' : 'default';
+  stage.draggable(mode === 'pan'); // <-- 🔁 ici
 }
 
 // 🔘 Boutons
@@ -33,8 +34,7 @@ buttons.forEach(id => {
         if (el) el.classList.remove('active');
       });
       btn.classList.add('active');
-      if (id === 'eraser') mode = 'eraser';
-      else if (id === 'pan') mode = 'pan';
+      mode = id;
       updateCursor();
     });
   }
