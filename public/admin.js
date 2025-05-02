@@ -1,5 +1,4 @@
 const socket = io();
-let deleteMode = false;
 
 const stage = new Konva.Stage({
   container: 'canvas-container',
@@ -10,27 +9,109 @@ const stage = new Konva.Stage({
 const layer = new Konva.Layer();
 stage.add(layer);
 
-// 🔁 Mode poubelle
-document.getElementById('delete-mode').onclick = () => {
-  deleteMode = !deleteMode;
-  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-  if (deleteMode) {
-    document.getElementById('delete-mode').classList.add('active');
-    stage.container().style.cursor = 'not-allowed';
-  } else {
-    document.getElementById('pan').classList.add('active');
-    stage.container().style.cursor = 'default';
+const incomingStrokes = {};
+let mode = 'pan';
+let eraserSize = 10;
+
+function updateCursor() {
+  stage.container().style.cursor = mode === 'eraser' ? 'cell' : 'default';
+}
+
+// 🔘 Boutons
+const buttons = [
+  'pan', 'zoom-in', 'zoom-out', 'reset-zoom',
+  'bg-black', 'bg-white', 'clear-canvas',
+  'export', 'back-home', 'eraser'
+];
+
+buttons.forEach(id => {
+  const btn = document.getElementById(id);
+  if (btn) {
+    btn.addEventListener('click', () => {
+      buttons.forEach(b => {
+        const el = document.getElementById(b);
+        if (el) el.classList.remove('active');
+      });
+      btn.classList.add('active');
+      if (id === 'eraser') mode = 'eraser';
+      else if (id === 'pan') mode = 'pan';
+      updateCursor();
+    });
   }
+});
+
+// 🔍 Zoom
+let scale = 1;
+document.getElementById('zoom-in').onclick = () => {
+  scale *= 1.2;
+  stage.scale({ x: scale, y: scale });
+  stage.batchDraw();
+};
+document.getElementById('zoom-out').onclick = () => {
+  scale /= 1.2;
+  stage.scale({ x: scale, y: scale });
+  stage.batchDraw();
+};
+document.getElementById('reset-zoom').onclick = () => {
+  scale = 1;
+  stage.scale({ x: 1, y: 1 });
+  stage.position({ x: 0, y: 0 });
+  stage.batchDraw();
 };
 
-// 🖱 Clic sur trait ou groupe = suppression
-stage.on('click', (e) => {
-  if (!deleteMode || e.target === stage) return;
+// 🎨 Fond
+document.getElementById('bg-black').onclick = () => {
+  document.getElementById('canvas-container').style.backgroundColor = '#111';
+};
+document.getElementById('bg-white').onclick = () => {
+  document.getElementById('canvas-container').style.backgroundColor = '#fff';
+};
 
-  const node = e.target;
-  const group = node.getParent();
-  const id = group?.id() || node.id();
+// 🧼 Effacer tout
+document.getElementById('clear-canvas').onclick = () => {
+  layer.destroyChildren();
+  layer.batchDraw();
+  socket.emit('clear-canvas');
+};
 
+// ↩️ Retour
+document.getElementById('back-home').onclick = () => {
+  window.location.href = '/';
+};
+
+// 📷 Export
+document.getElementById('export').onclick = () => {
+  const dataURL = stage.toDataURL({ pixelRatio: 2 });
+  const link = document.createElement('a');
+  link.download = 'dessin.png';
+  link.href = dataURL;
+  link.click();
+};
+
+// 🎚️ Slider gomme
+const slider = document.createElement('input');
+slider.type = 'range';
+slider.min = 5;
+slider.max = 50;
+slider.value = eraserSize;
+slider.id = 'eraser-size';
+slider.style.position = 'fixed';
+slider.style.bottom = '20px';
+slider.style.left = '10px';
+slider.style.zIndex = '1001';
+document.body.appendChild(slider);
+slider.addEventListener('input', e => {
+  eraserSize = parseInt(e.target.value);
+});
+
+// 🧽 Gomme objet
+stage.on('mousedown', e => {
+  if (mode !== 'eraser') return;
+  const pointer = stage.getPointerPosition();
+  const shape = layer.getIntersection(pointer);
+  if (!shape || shape === stage) return;
+  const group = shape.getParent();
+  const id = group?.id() || shape.id();
   if (id) {
     const target = layer.findOne('#' + id);
     if (target) {
@@ -41,7 +122,7 @@ stage.on('click', (e) => {
   }
 });
 
-// 🔄 Synchronisation suppression
+// 🔄 Suppressions
 socket.on('delete-shape', ({ id }) => {
   const target = layer.findOne('#' + id);
   if (target) {
@@ -50,10 +131,11 @@ socket.on('delete-shape', ({ id }) => {
   }
 });
 
-// 🎨 Ajout du trait ou groupe (draw-start)
+// 🖌️ Dessins entrants
 socket.on('draw-start', ({ id, x, y, color, size, mode }) => {
   if (mode === 'texture') {
     const group = new Konva.Group({ id });
+    incomingStrokes[id] = group;
     layer.add(group);
     return;
   }
@@ -67,12 +149,12 @@ socket.on('draw-start', ({ id, x, y, color, size, mode }) => {
     lineCap: 'round',
     lineJoin: 'round'
   });
+  incomingStrokes[id] = line;
   layer.add(line);
 });
 
-// 🖌️ Trait ou spray progressif (draw-progress)
 socket.on('draw-progress', ({ id, x, y, color, size, mode }) => {
-  const target = layer.findOne('#' + id);
+  const target = incomingStrokes[id];
   if (!target) return;
 
   if (mode === 'texture') {
@@ -104,7 +186,10 @@ socket.on('draw-progress', ({ id, x, y, color, size, mode }) => {
   layer.batchDraw();
 });
 
-socket.on('draw-end', () => {});
+socket.on('draw-end', ({ id }) => {
+  delete incomingStrokes[id];
+});
+
 socket.on('clear-canvas', () => {
   layer.destroyChildren();
   layer.batchDraw();

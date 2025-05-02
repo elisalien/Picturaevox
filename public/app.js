@@ -18,6 +18,14 @@ let currentLine = null;
 let currentGroup = null;
 const incomingStrokes = {};
 
+function getLocalPointer() {
+  const pos = stage.getPointerPosition();
+  return {
+    x: pos.x / stage.scaleX() - stage.x() / stage.scaleX(),
+    y: pos.y / stage.scaleY() - stage.y() / stage.scaleY()
+  };
+}
+
 document.querySelectorAll('.tool-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
@@ -115,21 +123,12 @@ socket.on('draw-end', ({ id }) => {
 stage.on('mousedown touchstart', () => {
   if (mode === 'pan') return;
   isDrawing = true;
-  const pos = stage.getPointerPosition();
+  const pos = getLocalPointer();
 
   if (mode === 'texture') {
     currentGroup = new Konva.Group({ id: userId });
     layer.add(currentGroup);
-    incomingStrokes[userId] = currentGroup;
-
-    socket.emit('draw-start', {
-      id: userId,
-      x: pos.x,
-      y: pos.y,
-      color: currentColor,
-      size: brushSize,
-      mode
-    });
+    socket.emit('draw-start', { id: userId, x: pos.x, y: pos.y, color: currentColor, size: brushSize, mode });
     return;
   }
 
@@ -143,20 +142,12 @@ stage.on('mousedown touchstart', () => {
     lineJoin: 'round'
   });
   layer.add(currentLine);
-
-  socket.emit('draw-start', {
-    id: userId,
-    x: pos.x,
-    y: pos.y,
-    color: currentColor,
-    size: brushSize,
-    mode
-  });
+  socket.emit('draw-start', { id: userId, x: pos.x, y: pos.y, color: currentColor, size: brushSize, mode });
 });
 
 stage.on('mousemove touchmove', () => {
-  if (!isDrawing) return;
-  const pos = stage.getPointerPosition();
+  if (!isDrawing || mode === 'pan') return;
+  const pos = getLocalPointer();
 
   if (mode === 'texture') {
     for (let i = 0; i < 5; i++) {
@@ -180,29 +171,13 @@ stage.on('mousemove touchmove', () => {
       currentGroup.add(dot);
     }
     layer.batchDraw();
-
-    socket.emit('draw-progress', {
-      id: userId,
-      x: pos.x,
-      y: pos.y,
-      color: currentColor,
-      size: brushSize,
-      mode
-    });
+    socket.emit('draw-progress', { id: userId, x: pos.x, y: pos.y, color: currentColor, size: brushSize, mode });
     return;
   }
 
   currentLine.points(currentLine.points().concat([pos.x, pos.y]));
   layer.batchDraw();
-
-  socket.emit('draw-progress', {
-    id: userId,
-    x: pos.x,
-    y: pos.y,
-    color: currentColor,
-    size: brushSize,
-    mode
-  });
+  socket.emit('draw-progress', { id: userId, x: pos.x, y: pos.y, color: currentColor, size: brushSize, mode });
 });
 
 stage.on('mouseup touchend', () => {
