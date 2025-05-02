@@ -54,13 +54,13 @@ socket.on('draw-start', ({ id, x, y, color, size, mode }) => {
   if (id === userId) return;
 
   const line = new Konva.Line({
+    id, // ✅ essentiel pour suppression future
     stroke: mode === 'eraser' ? 'black' : color,
     strokeWidth: mode === 'eraser' ? size * 2 : size,
     globalCompositeOperation: mode === 'eraser' ? 'destination-out' : 'source-over',
     points: [x, y],
     lineCap: 'round',
-    lineJoin: 'round',
-    id
+    lineJoin: 'round'
   });
   incomingStrokes[id] = line;
   layer.add(line);
@@ -78,7 +78,6 @@ socket.on('draw-end', ({ id }) => {
   delete incomingStrokes[id];
 });
 
-// ✅ Synchronisation suppression
 socket.on('delete-shape', ({ id }) => {
   const shape = layer.findOne('#' + id);
   if (shape) {
