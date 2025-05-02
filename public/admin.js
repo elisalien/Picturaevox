@@ -23,13 +23,13 @@ document.getElementById('delete-mode').onclick = () => {
   }
 };
 
-// 🖱 Suppression directe
+// 🖱 Clic sur trait ou groupe = suppression
 stage.on('click', (e) => {
   if (!deleteMode || e.target === stage) return;
 
-  const shape = e.target;
-  const group = shape.getParent();
-  const id = group?.id() || shape.id();
+  const node = e.target;
+  const group = node.getParent();
+  const id = group?.id() || node.id();
 
   if (id) {
     const target = layer.findOne('#' + id);
@@ -41,14 +41,16 @@ stage.on('click', (e) => {
   }
 });
 
-// 🔄 Suppression propagée
+// 🔄 Synchronisation suppression
 socket.on('delete-shape', ({ id }) => {
-  const shape = layer.findOne('#' + id);
-  if (shape) shape.destroy();
-  layer.batchDraw();
+  const target = layer.findOne('#' + id);
+  if (target) {
+    target.destroy();
+    layer.batchDraw();
+  }
 });
 
-// 🎨 Ajout des traits (classiques ou groupes)
+// 🎨 Ajout du trait ou groupe (draw-start)
 socket.on('draw-start', ({ id, x, y, color, size, mode }) => {
   if (mode === 'texture') {
     const group = new Konva.Group({ id });
@@ -68,7 +70,7 @@ socket.on('draw-start', ({ id, x, y, color, size, mode }) => {
   layer.add(line);
 });
 
-// 🔁 Mise à jour texture ou ligne
+// 🖌️ Trait ou spray progressif (draw-progress)
 socket.on('draw-progress', ({ id, x, y, color, size, mode }) => {
   const target = layer.findOne('#' + id);
   if (!target) return;
@@ -91,6 +93,7 @@ socket.on('draw-progress', ({ id, x, y, color, size, mode }) => {
         ],
         lineCap: 'round',
       });
+
       target.add(dot);
     }
     layer.batchDraw();
