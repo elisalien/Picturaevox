@@ -1,5 +1,4 @@
-require('dotenv').config(); // Charge .env
-
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const path = require('path');
@@ -9,30 +8,25 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Sert les fichiers statiques depuis ./public
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Page publique
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/index.html'));
 });
 
-// ✅ Page admin protégée par mot de passe dans l'URL
 app.get('/chantilly', (req, res) => {
   const { password } = req.query;
   if (password !== process.env.ADMIN_PASSWORD) {
-    return res.redirect('/admin-login.html'); // redirige vers formulaire
+    return res.redirect('/admin-login.html');
   }
   res.sendFile(path.join(__dirname, 'public/admin.html'));
 });
 
-// Canvas data en mémoire
 let drawingData = {};
 
 io.on('connection', (socket) => {
-  console.log('🟢 Client connecté :', socket.id);
+  console.log('🟢', socket.id);
 
-  // Envoie les tracés existants au nouveau client
   for (const [id, points] of Object.entries(drawingData)) {
     socket.emit('draw-start', points[0]);
     for (let i = 1; i < points.length; i++) {
@@ -57,18 +51,17 @@ io.on('connection', (socket) => {
     io.emit('draw-end', { id });
   });
 
+  socket.on('delete-shape', ({ id }) => {
+    delete drawingData[id];
+    io.emit('delete-shape', { id });
+  });
+
   socket.on('clear-canvas', () => {
     drawingData = {};
     io.emit('clear-canvas');
   });
-
-  socket.on('disconnect', () => {
-    console.log('🔴 Client déconnecté :', socket.id);
-  });
 });
 
-// 🚀 Port Railway ou local
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`✅ Serveur lancé sur http://localhost:${PORT}`);
+server.listen(process.env.PORT || 3000, () => {
+  console.log('✅ Server on http://localhost:3000');
 });

@@ -7,7 +7,6 @@ const stage = new Konva.Stage({
   height: window.innerHeight,
   draggable: false,
 });
-
 const layer = new Konva.Layer();
 stage.add(layer);
 
@@ -18,18 +17,12 @@ let brushSize = 4;
 let currentLine = null;
 const incomingStrokes = {};
 
-window.addEventListener('resize', () => {
-  stage.width(window.innerWidth);
-  stage.height(window.innerHeight);
-});
-
 document.querySelectorAll('.tool-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     mode = btn.id;
     stage.draggable(mode === 'pan');
-    document.body.classList.toggle('pan-mode', mode === 'pan');
   });
 });
 
@@ -45,16 +38,10 @@ document.getElementById('size-slider').addEventListener('input', e => {
   brushSize = parseInt(e.target.value);
 });
 
-socket.on('clear-canvas', () => {
-  layer.destroyChildren();
-  layer.batchDraw();
-});
-
 socket.on('draw-start', ({ id, x, y, color, size, mode }) => {
   if (id === userId) return;
-
   const line = new Konva.Line({
-    id, // ✅ essentiel pour suppression future
+    id,
     stroke: mode === 'eraser' ? 'black' : color,
     strokeWidth: mode === 'eraser' ? size * 2 : size,
     globalCompositeOperation: mode === 'eraser' ? 'destination-out' : 'source-over',
@@ -86,19 +73,24 @@ socket.on('delete-shape', ({ id }) => {
   }
 });
 
+socket.on('clear-canvas', () => {
+  layer.destroyChildren();
+  layer.batchDraw();
+});
+
 stage.on('mousedown touchstart', () => {
   if (mode === 'pan') return;
   isDrawing = true;
-  const pos = stage.getRelativePointerPosition(layer);
+  const pos = stage.getPointerPosition();
 
   currentLine = new Konva.Line({
+    id: userId,
     stroke: mode === 'eraser' ? 'black' : currentColor,
     strokeWidth: mode === 'eraser' ? brushSize * 2 : brushSize,
     globalCompositeOperation: mode === 'eraser' ? 'destination-out' : 'source-over',
     points: [pos.x, pos.y],
     lineCap: 'round',
-    lineJoin: 'round',
-    id: userId
+    lineJoin: 'round'
   });
   layer.add(currentLine);
 
@@ -114,7 +106,7 @@ stage.on('mousedown touchstart', () => {
 
 stage.on('mousemove touchmove', () => {
   if (!isDrawing) return;
-  const pos = stage.getRelativePointerPosition(layer);
+  const pos = stage.getPointerPosition();
   currentLine.points(currentLine.points().concat([pos.x, pos.y]));
   layer.batchDraw();
 
