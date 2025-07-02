@@ -45,6 +45,30 @@ socket.on('drawing', data => {
   layer.batchDraw();
 });
 
+// Listen for texture brush events
+socket.on('texture', data => {
+  for (let i = 0; i < 5; i++) {
+    const offsetX = (Math.random() - 0.5) * 10;
+    const offsetY = (Math.random() - 0.5) * 10;
+    const alpha = 0.3 + Math.random() * 0.3;
+    const dot = new Konva.Line({
+      points: [
+        data.x + offsetX,
+        data.y + offsetY,
+        data.x + offsetX + Math.random() * 2,
+        data.y + offsetY + Math.random() * 2
+      ],
+      stroke: data.color,
+      strokeWidth: 1 + Math.random() * (data.size / 3),
+      globalAlpha: alpha,
+      lineCap: 'round',
+      lineJoin: 'round'
+    });
+    layer.add(dot);
+  }
+  layer.batchDraw();
+});
+
 // Final draw event
 socket.on('draw', data => {
   let shape = layer.findOne('#' + data.id);
