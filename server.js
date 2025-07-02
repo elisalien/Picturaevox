@@ -5,10 +5,7 @@ const path = require('path');
 const http = require('http').Server(app);
 const io = require('socket.io')(http);
 
-// Serve static files from 'public' directory
 app.use(express.static(path.join(__dirname, 'public')));
-
-// Route for admin interface
 app.get('/chantilly', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
@@ -16,17 +13,22 @@ app.get('/chantilly', (req, res) => {
 io.on('connection', socket => {
   console.log('a user connected');
 
-  // Broadcast drawing events
+  // Draw events
   socket.on('draw', data => {
     socket.broadcast.emit('draw', data);
   });
 
-  // Broadcast shape deletion
+  // Streaming drawing
+  socket.on('drawing', data => {
+    socket.broadcast.emit('drawing', data);
+  });
+
+  // Delete shape
   socket.on('deleteShape', ({ id }) => {
     io.emit('deleteShape', { id });
   });
 
-  // Broadcast clear canvas
+  // Clear canvas
   socket.on('clearCanvas', () => {
     io.emit('clearCanvas');
   });

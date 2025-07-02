@@ -1,35 +1,45 @@
 // app.js (publique)
 const socket = io();
-
-// Initialisation du stage et du layer
 const stage = new Konva.Stage({
-  container: 'canvas-container',                // <–– correction ici
+  container: 'canvas-container',
   width: window.innerWidth,
   height: window.innerHeight
 });
 const layer = new Konva.Layer();
 stage.add(layer);
 
-// États globaux
 let currentTool  = 'brush';
 let currentColor = document.querySelector('.color-btn.active').dataset.color;
 let currentSize  = parseInt(document.getElementById('size-slider').value, 10);
 let isDrawing    = false;
 let lastLine;
 
-// Générateur d’ID unique
+// Throttle helper
+function throttle(func, wait) {
+  let lastTime = 0;
+  return function(...args) {
+    const now = Date.now();
+    if (now - lastTime >= wait) {
+      lastTime = now;
+      func.apply(this, args);
+    }
+  };
+}
+
 function generateId() {
   return 'shape_' + Date.now() + '_' + Math.round(Math.random() * 10000);
 }
 
-// Gestion des outils
-const tools = document.querySelectorAll('.tool-btn');
-tools.forEach(btn => {
+const emitDrawingThrottled = throttle((data) => {
+  socket.emit('drawing', data);
+}, 50);
+
+// Tool buttons
+document.querySelectorAll('.tool-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    tools.forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    currentTool = btn.id; // 'brush', 'texture', 'eraser', 'pan'
-    // Activation/désactivation du drag pour le pan
+    currentTool = btn.id; // brush, texture, eraser, pan
     if (currentTool === 'pan') {
       stage.draggable(true);
       stage.container().style.cursor = 'grab';
@@ -40,22 +50,21 @@ tools.forEach(btn => {
   });
 });
 
-// Choix de couleur
-const colors = document.querySelectorAll('.color-btn');
-colors.forEach(btn => {
+// Color selection
+document.querySelectorAll('.color-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    colors.forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.color-btn').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     currentColor = btn.dataset.color;
   });
 });
 
-// Réglage de la taille
+// Size slider
 document.getElementById('size-slider').addEventListener('input', e => {
   currentSize = parseInt(e.target.value, 10);
 });
 
-// Début du dessin / effacement
+// Drawing events
 stage.on('mousedown touchstart', () => {
   if (currentTool === 'pan') return;
   isDrawing = true;
@@ -66,25 +75,29 @@ stage.on('mousedown touchstart', () => {
     points: [pos.x, pos.y],
     stroke: currentTool === 'eraser' ? null : currentColor,
     strokeWidth: currentSize,
-    globalCompositeOperation: currentTool === 'eraser'
-      ? 'destination-out'
-      : 'source-over',
+    globalCompositeOperation: currentTool === 'eraser' ? 'destination-out' : 'source-over',
     lineCap: 'round',
     lineJoin: 'round'
   });
   layer.add(lastLine);
-  stage.draw();
+  layer.draw();
 });
 
-// Poursuite du tracé
 stage.on('mousemove touchmove', () => {
   if (!isDrawing) return;
   const pos = stage.getPointerPosition();
   lastLine.points(lastLine.points().concat([pos.x, pos.y]));
   layer.batchDraw();
+  // Stream updates
+  emitDrawingThrottled({
+    id: lastLine.id(),
+    points: lastLine.points(),
+    stroke: lastLine.stroke(),
+    strokeWidth: lastLine.strokeWidth(),
+    globalCompositeOperation: lastLine.globalCompositeOperation()
+  });
 });
 
-// Fin du tracé et émission
 stage.on('mouseup touchend', () => {
   if (!isDrawing) return;
   isDrawing = false;
@@ -97,22 +110,48 @@ stage.on('mouseup touchend', () => {
   });
 });
 
-// Réception d’un dessin depuis le serveur
+// Socket listeners
+socket.on('drawing', data => {
+  let shape = layer.findOne('#' + data.id);
+  if (shape) {
+    shape.points(data.points);
+  } else {
+    const line = new Konva.Line({
+      id: data.id,
+      points: data.points,
+      stroke: data.stroke,
+      strokeWidth: data.strokeWidth,
+      globalCompositeOperation: data.globalCompositeOperation,
+      lineCap: 'round',
+      lineJoin: 'round'
+    });
+    layer.add(line);
+  }
+  layer.batchDraw();
+});
+
 socket.on('draw', data => {
-  const line = new Konva.Line({
-    id: data.id,
-    points: data.points,
-    stroke: data.stroke,
-    strokeWidth: data.strokeWidth,
-    globalCompositeOperation: data.globalCompositeOperation,
-    lineCap: 'round',
-    lineJoin: 'round'
-  });
-  layer.add(line);
+  let shape = layer.findOne('#' + data.id);
+  if (shape) {
+    shape.points(data.points);
+    shape.stroke(data.stroke);
+    shape.strokeWidth(data.strokeWidth);
+    shape.globalCompositeOperation(data.globalCompositeOperation);
+  } else {
+    const line = new Konva.Line({
+      id: data.id,
+      points: data.points,
+      stroke: data.stroke,
+      strokeWidth: data.strokeWidth,
+      globalCompositeOperation: data.globalCompositeOperation,
+      lineCap: 'round',
+      lineJoin: 'round'
+    });
+    layer.add(line);
+  }
   layer.draw();
 });
 
-// Suppression d’une forme spécifique
 socket.on('deleteShape', ({ id }) => {
   const shape = layer.findOne('#' + id);
   if (shape) {
@@ -121,7 +160,6 @@ socket.on('deleteShape', ({ id }) => {
   }
 });
 
-// Effacement complet du canvas
 socket.on('clearCanvas', () => {
   layer.destroyChildren();
   layer.draw();
