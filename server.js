@@ -15,10 +15,6 @@ app.get('/', (req, res) => {
 });
 
 app.get('/chantilly', (req, res) => {
-  const { password } = req.query;
-  if (password !== process.env.ADMIN_PASSWORD) {
-    return res.redirect('/admin-login.html');
-  }
   res.sendFile(path.join(__dirname, 'public/admin.html'));
 });
 

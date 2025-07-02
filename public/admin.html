@@ -5,18 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin – Picturævox</title>
   <link rel="stylesheet" href="style.css" />
-  <script>
-    const pass = prompt("Code d’accès admin :");
-    if (pass !== "framboisier") {
-      window.location.href = "/";
-    } else {
-      const url = new URL(window.location.href);
-      if (!url.searchParams.get("password")) {
-        url.searchParams.set("password", pass);
-        window.location.href = url.toString();
-      }
-    }
-  </script>
   <script src="https://cdn.jsdelivr.net/npm/konva@9.2.0/konva.min.js"></script>
   <script src="/socket.io/socket.io.js" defer></script>
   <script src="admin.js" defer></script>

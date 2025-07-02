@@ -3,20 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <title>Connexion admin – Picturævox</title>
+  <meta http-equiv="refresh" content="0; URL='/chantilly'" />
 </head>
-<body style="display:flex;justify-content:center;align-items:center;height:100vh;background:#111;color:white;font-family:sans-serif;">
-  <form onsubmit="login(event)">
-    <label for="code">Code admin :</label>
-    <input type="password" id="code" placeholder="Entrez le code" />
-    <button type="submit">Valider</button>
-  </form>
-
-  <script>
-    function login(e) {
-      e.preventDefault();
-      const val = document.getElementById('code').value;
-      window.location.href = '/chantilly?password=' + encodeURIComponent(val);
-    }
-  </script>
+<body style="background:#111;color:white;font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;">
+  <p>Redirection vers l'interface admin...</p>
 </body>
 </html>
