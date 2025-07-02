@@ -42,7 +42,6 @@ document.querySelectorAll('.tool-btn').forEach(btn => {
     document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentTool = btn.id;
-    // cursor style
     const cursor = currentTool === 'pan' ? 'grab' : 'crosshair';
     stage.container().style.cursor = cursor;
   });
@@ -81,17 +80,22 @@ socket.on('initShapes', shapes => {
 
 // Drawing and pan handlers
 stage.on('mousedown touchstart', () => {
+  const pointer = stage.getPointerPosition();
   if (currentTool === 'pan') {
-    lastPanPos = stage.getPointerPosition();
+    lastPanPos = pointer;
     isDrawing = false;
     return;
   }
   isDrawing = true;
   currentId = generateId();
-  const pos = stage.getPointerPosition();
+  // Convert to stage coordinates by subtracting pan offsets
+  const scenePos = {
+    x: pointer.x - stage.x(),
+    y: pointer.y - stage.y()
+  };
   lastLine = new Konva.Line({
     id: currentId,
-    points: [pos.x, pos.y],
+    points: [scenePos.x, scenePos.y],
     stroke: currentTool === 'eraser' ? null : currentColor,
     strokeWidth: currentSize,
     globalCompositeOperation: currentTool === 'eraser' ? 'destination-out' : 'source-over',
@@ -102,18 +106,22 @@ stage.on('mousedown touchstart', () => {
 });
 
 stage.on('mousemove touchmove', () => {
-  const pos = stage.getPointerPosition();
+  const pointer = stage.getPointerPosition();
   if (currentTool === 'pan' && lastPanPos) {
-    const dx = pos.x - lastPanPos.x;
-    const dy = pos.y - lastPanPos.y;
+    const dx = pointer.x - lastPanPos.x;
+    const dy = pointer.y - lastPanPos.y;
     stage.x(stage.x() + dx);
     stage.y(stage.y() + dy);
     stage.batchDraw();
-    lastPanPos = pos;
+    lastPanPos = pointer;
     return;
   }
   if (!isDrawing) return;
-  lastLine.points(lastLine.points().concat([pos.x, pos.y]));
+  const scenePos = {
+    x: pointer.x - stage.x(),
+    y: pointer.y - stage.y()
+  };
+  lastLine.points(lastLine.points().concat([scenePos.x, scenePos.y]));
   layer.batchDraw();
   emitDrawingThrottled({
     id: currentId,
@@ -125,6 +133,7 @@ stage.on('mousemove touchmove', () => {
 });
 
 stage.on('mouseup touchend', () => {
+  const pointer = stage.getPointerPosition();
   if (currentTool === 'pan') {
     lastPanPos = null;
     return;
