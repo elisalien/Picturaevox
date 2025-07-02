@@ -24,6 +24,11 @@ io.on('connection', socket => {
     socket.broadcast.emit('drawing', data);
   });
 
+  // Broadcast texture brush data
+  socket.on('texture', data => {
+    socket.broadcast.emit('texture', data);
+  });
+
   // Final draw event, update store and broadcast
   socket.on('draw', data => {
     shapes[data.id] = data;

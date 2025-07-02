@@ -25,7 +25,7 @@ socket.on('initShapes', shapes => {
   layer.draw();
 });
 
-// Real-time streaming updates
+// Listen for streaming drawing
 socket.on('drawing', data => {
   let shape = layer.findOne('#' + data.id);
   if (shape) {
@@ -45,7 +45,31 @@ socket.on('drawing', data => {
   layer.batchDraw();
 });
 
-// Final draw event
+// Listen for texture brush events
+socket.on('texture', data => {
+  for (let i = 0; i < 5; i++) {
+    const offsetX = (Math.random() - 0.5) * 10;
+    const offsetY = (Math.random() - 0.5) * 10;
+    const alpha = 0.3 + Math.random() * 0.3;
+    const dot = new Konva.Line({
+      points: [
+        data.x + offsetX,
+        data.y + offsetY,
+        data.x + offsetX + Math.random() * 2,
+        data.y + offsetY + Math.random() * 2
+      ],
+      stroke: data.color,
+      strokeWidth: 1 + Math.random() * (data.size / 3),
+      globalAlpha: alpha,
+      lineCap: 'round',
+      lineJoin: 'round'
+    });
+    layer.add(dot);
+  }
+  layer.batchDraw();
+});
+
+// Listen for final draw events
 socket.on('draw', data => {
   let shape = layer.findOne('#' + data.id);
   if (shape) {
@@ -81,79 +105,4 @@ socket.on('deleteShape', ({ id }) => {
 socket.on('clearCanvas', () => {
   layer.destroyChildren();
   layer.draw();
-});
-
-// Toolbar controls
-let currentTool = 'pan'; 
-const container = stage.getContainer();
-
-// Pan
-document.getElementById('pan').addEventListener('click', () => {
-  currentTool = 'pan';
-  stage.draggable(true);
-  container.style.cursor = 'grab';
-});
-
-// Zoom in/out/reset
-const scaleBy = 1.2;
-document.getElementById('zoom-in').addEventListener('click', () => {
-  stage.scaleX(stage.scaleX() * scaleBy);
-  stage.scaleY(stage.scaleY() * scaleBy);
-  stage.batchDraw();
-});
-document.getElementById('zoom-out').addEventListener('click', () => {
-  stage.scaleX(stage.scaleX() / scaleBy);
-  stage.scaleY(stage.scaleY() / scaleBy);
-  stage.batchDraw();
-});
-document.getElementById('reset-zoom').addEventListener('click', () => {
-  stage.scaleX(1);
-  stage.scaleY(1);
-  stage.position({ x: 0, y: 0 });
-  stage.batchDraw();
-});
-
-// Background toggle
-document.getElementById('bg-black').addEventListener('click', () => {
-  container.style.backgroundColor = '#000';
-});
-document.getElementById('bg-white').addEventListener('click', () => {
-  container.style.backgroundColor = '#fff';
-});
-
-// Eraser for object deletion
-document.getElementById('eraser').addEventListener('click', () => {
-  currentTool = 'eraser';
-  stage.draggable(false);
-  container.style.cursor = 'crosshair';
-});
-stage.on('click', evt => {
-  if (currentTool === 'eraser' && evt.target && evt.target.getClassName() === 'Line') {
-    const shape = evt.target;
-    const id = shape.id();
-    shape.destroy();
-    layer.draw();
-    socket.emit('deleteShape', { id });
-  }
-});
-
-// Clear canvas
-document.getElementById('clear-canvas').addEventListener('click', () => {
-  layer.destroyChildren();
-  layer.draw();
-  socket.emit('clearCanvas');
-});
-
-// Export PNG
-document.getElementById('export').addEventListener('click', () => {
-  const uri = stage.toDataURL({ pixelRatio: 3 });
-  const link = document.createElement('a');
-  link.download = 'canvas.png';
-  link.href = uri;
-  link.click();
-});
-
-// Back to public
-document.getElementById('back-home').addEventListener('click', () => {
-  window.location.href = '/';
 });
