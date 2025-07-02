@@ -14,6 +14,7 @@ let currentSize  = parseInt(document.getElementById('size-slider').value, 10);
 let isDrawing    = false;
 let lastLine;
 let currentId;
+let lastPanPos = null;
 
 // Throttle helper
 function throttle(func, wait) {
@@ -41,13 +42,9 @@ document.querySelectorAll('.tool-btn').forEach(btn => {
     document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentTool = btn.id;
-    if (currentTool === 'pan') {
-      stage.draggable(true);
-      stage.container().style.cursor = 'grab';
-    } else {
-      stage.draggable(false);
-      stage.container().style.cursor = 'crosshair';
-    }
+    // cursor style
+    const cursor = currentTool === 'pan' ? 'grab' : 'crosshair';
+    stage.container().style.cursor = cursor;
   });
 });
 
@@ -82,61 +79,40 @@ socket.on('initShapes', shapes => {
   layer.draw();
 });
 
-// Drawing events
+// Drawing and pan handlers
 stage.on('mousedown touchstart', () => {
-  if (currentTool === 'pan') return;
+  if (currentTool === 'pan') {
+    lastPanPos = stage.getPointerPosition();
+    isDrawing = false;
+    return;
+  }
   isDrawing = true;
   currentId = generateId();
   const pos = stage.getPointerPosition();
-  if (currentTool !== 'texture') {
-    lastLine = new Konva.Line({
-      id: currentId,
-      points: [pos.x, pos.y],
-      stroke: currentTool === 'eraser' ? null : currentColor,
-      strokeWidth: currentSize,
-      globalCompositeOperation: currentTool === 'eraser' ? 'destination-out' : 'source-over',
-      lineCap: 'round',
-      lineJoin: 'round'
-    });
-    layer.add(lastLine);
-  }
+  lastLine = new Konva.Line({
+    id: currentId,
+    points: [pos.x, pos.y],
+    stroke: currentTool === 'eraser' ? null : currentColor,
+    strokeWidth: currentSize,
+    globalCompositeOperation: currentTool === 'eraser' ? 'destination-out' : 'source-over',
+    lineCap: 'round',
+    lineJoin: 'round'
+  });
+  layer.add(lastLine);
 });
 
 stage.on('mousemove touchmove', () => {
-  if (!isDrawing) return;
   const pos = stage.getPointerPosition();
-  if (currentTool === 'texture') {
-    // Generate textured dots
-    for (let i = 0; i < 5; i++) {
-      const offsetX = (Math.random() - 0.5) * 10;
-      const offsetY = (Math.random() - 0.5) * 10;
-      const alpha = 0.3 + Math.random() * 0.3;
-      const dot = new Konva.Line({
-        points: [
-          pos.x + offsetX,
-          pos.y + offsetY,
-          pos.x + offsetX + Math.random() * 2,
-          pos.y + offsetY + Math.random() * 2
-        ],
-        stroke: currentColor,
-        strokeWidth: 1 + Math.random() * (currentSize / 3),
-        globalAlpha: alpha,
-        lineCap: 'round',
-        lineJoin: 'round'
-      });
-      layer.add(dot);
-    }
-    layer.batchDraw();
-    socket.emit('texture', {
-      id: currentId,
-      x: pos.x,
-      y: pos.y,
-      color: currentColor,
-      size: currentSize
-    });
+  if (currentTool === 'pan' && lastPanPos) {
+    const dx = pos.x - lastPanPos.x;
+    const dy = pos.y - lastPanPos.y;
+    stage.x(stage.x() + dx);
+    stage.y(stage.y() + dy);
+    stage.batchDraw();
+    lastPanPos = pos;
     return;
   }
-  // Brush
+  if (!isDrawing) return;
   lastLine.points(lastLine.points().concat([pos.x, pos.y]));
   layer.batchDraw();
   emitDrawingThrottled({
@@ -149,17 +125,19 @@ stage.on('mousemove touchmove', () => {
 });
 
 stage.on('mouseup touchend', () => {
+  if (currentTool === 'pan') {
+    lastPanPos = null;
+    return;
+  }
   if (!isDrawing) return;
   isDrawing = false;
-  if (currentTool !== 'texture') {
-    socket.emit('draw', {
-      id: currentId,
-      points: lastLine.points(),
-      stroke: lastLine.stroke(),
-      strokeWidth: lastLine.strokeWidth(),
-      globalCompositeOperation: lastLine.globalCompositeOperation()
-    });
-  }
+  socket.emit('draw', {
+    id: currentId,
+    points: lastLine.points(),
+    stroke: lastLine.stroke(),
+    strokeWidth: lastLine.strokeWidth(),
+    globalCompositeOperation: lastLine.globalCompositeOperation()
+  });
 });
 
 // Socket listeners
@@ -178,29 +156,6 @@ socket.on('drawing', data => {
       lineJoin: 'round'
     });
     layer.add(line);
-  }
-  layer.batchDraw();
-});
-
-socket.on('texture', data => {
-  for (let i = 0; i < 5; i++) {
-    const offsetX = (Math.random() - 0.5) * 10;
-    const offsetY = (Math.random() - 0.5) * 10;
-    const alpha = 0.3 + Math.random() * 0.3;
-    const dot = new Konva.Line({
-      points: [
-        data.x + offsetX,
-        data.y + offsetY,
-        data.x + offsetX + Math.random() * 2,
-        data.y + offsetY + Math.random() * 2
-      ],
-      stroke: data.color,
-      strokeWidth: 1 + Math.random() * (data.size / 3),
-      globalAlpha: alpha,
-      lineCap: 'round',
-      lineJoin: 'round'
-    });
-    layer.add(dot);
   }
   layer.batchDraw();
 });
