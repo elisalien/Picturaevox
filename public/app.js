@@ -64,6 +64,23 @@ document.getElementById('size-slider').addEventListener('input', e => {
   currentSize = parseInt(e.target.value, 10);
 });
 
+// Initialize existing shapes on load
+socket.on('initShapes', shapes => {
+  shapes.forEach(data => {
+    const line = new Konva.Line({
+      id: data.id,
+      points: data.points,
+      stroke: data.stroke,
+      strokeWidth: data.strokeWidth,
+      globalCompositeOperation: data.globalCompositeOperation,
+      lineCap: 'round',
+      lineJoin: 'round'
+    });
+    layer.add(line);
+  });
+  layer.draw();
+});
+
 // Drawing events
 stage.on('mousedown touchstart', () => {
   if (currentTool === 'pan') return;
@@ -110,7 +127,7 @@ stage.on('mouseup touchend', () => {
   });
 });
 
-// Socket listeners
+// Real-time drawing update
 socket.on('drawing', data => {
   let shape = layer.findOne('#' + data.id);
   if (shape) {
@@ -130,6 +147,7 @@ socket.on('drawing', data => {
   layer.batchDraw();
 });
 
+// Final draw event
 socket.on('draw', data => {
   let shape = layer.findOne('#' + data.id);
   if (shape) {
@@ -152,6 +170,7 @@ socket.on('draw', data => {
   layer.draw();
 });
 
+// Shape deletion
 socket.on('deleteShape', ({ id }) => {
   const shape = layer.findOne('#' + id);
   if (shape) {
@@ -160,6 +179,7 @@ socket.on('deleteShape', ({ id }) => {
   }
 });
 
+// Canvas clear
 socket.on('clearCanvas', () => {
   layer.destroyChildren();
   layer.draw();

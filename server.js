@@ -5,6 +5,9 @@ const path = require('path');
 const http = require('http').Server(app);
 const io = require('socket.io')(http);
 
+// In-memory store for shapes
+const shapes = {};
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/chantilly', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
@@ -13,23 +16,29 @@ app.get('/chantilly', (req, res) => {
 io.on('connection', socket => {
   console.log('a user connected');
 
-  // Draw events
-  socket.on('draw', data => {
-    socket.broadcast.emit('draw', data);
-  });
+  // Send existing shapes to this client
+  socket.emit('initShapes', Object.values(shapes));
 
-  // Streaming drawing
+  // Broadcast streaming drawing data
   socket.on('drawing', data => {
     socket.broadcast.emit('drawing', data);
   });
 
-  // Delete shape
+  // Final draw event, update store and broadcast
+  socket.on('draw', data => {
+    shapes[data.id] = data;
+    socket.broadcast.emit('draw', data);
+  });
+
+  // Shape deletion, update store and broadcast
   socket.on('deleteShape', ({ id }) => {
+    delete shapes[id];
     io.emit('deleteShape', { id });
   });
 
-  // Clear canvas
+  // Clear canvas, clear store and broadcast
   socket.on('clearCanvas', () => {
+    for (let id in shapes) delete shapes[id];
     io.emit('clearCanvas');
   });
 
